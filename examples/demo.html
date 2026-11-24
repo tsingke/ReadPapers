@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attention Is All You Need — 双栏批注阅读（示例）</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--paper); color: var(--ink);
+      font-family: "IBM Plex Sans", -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.7;
+    }
+
+    /* 顶部导航栏 */
+    .topbar {
+      background: var(--navy); color: #fff;
+      padding: 20px 28px; display: flex; flex-wrap: wrap;
+      align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .topbar h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: .3px; }
+    .topbar .meta { font-size: .82rem; opacity: .75; margin-top: 4px; }
+    .topbar .meta a { color: #fff; }
+    .legend { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { padding: 3px 10px; border-radius: 999px; font-size: .78rem; color: #333; }
+
+    /* 示例说明条 */
+    .demo-banner {
+      background: #fff6e0; color: #7a5a10;
+      border-bottom: 1px solid var(--border);
+      padding: 8px 24px; font-size: .82rem; text-align: center;
+    }
+
+    /* sticky 章节导航 */
+    .secnav {
+      position: sticky; top: 0; z-index: 10;
+      background: #fff; border-bottom: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 24px;
+    }
+    .secnav a {
+      color: var(--navy); text-decoration: none;
+      font-size: .85rem; padding: 4px 12px; border-radius: 6px;
+    }
+    .secnav a:hover { background: var(--trans-bg); }
+
+    /* 主体 */
+    main { max-width: 1280px; margin: 0 auto; padding: 28px 24px 8px; }
+    .sec-title {
+      font-size: 1.1rem; color: var(--navy);
+      border-bottom: 2px solid var(--border); padding-bottom: 6px; margin-bottom: 18px;
+    }
+    .grid {
+      display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+      gap: 24px; align-items: start;
+    }
+
+    /* 左栏：段落 */
+    .passage { margin-bottom: 22px; }
+    .passage .en {
+      font-family: Lora, Georgia, "Times New Roman", serif;
+      font-size: .98rem; line-height: 1.85; text-align: justify;
+    }
+    .passage .trans {
+      margin-top: 10px; padding: 10px 14px;
+      background: var(--trans-bg);
+      border-left: 3px solid var(--trans-bar);
+      border-bottom: 1px solid var(--border);
+      font-size: .92rem; color: #3d3d3d;
+    }
+
+    /* 五色高亮（只用在这五个类上） */
+    .hl-thesis     { background: var(--hl-thesis); }
+    .hl-concept    { background: var(--hl-concept); }
+    .hl-evidence   { background: var(--hl-evidence); }
+    .hl-concession { background: var(--hl-concession); }
+    .hl-method     { background: var(--hl-method); }
+    .hl-thesis, .hl-concept, .hl-evidence, .hl-concession, .hl-method {
+      padding: 0 3px; border-radius: 3px;
+    }
+
+    /* 右栏：批注卡片 */
+    .note {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px; margin-bottom: 22px;
+      font-size: .88rem;
+    }
+    /* 卡片左色边按该段主维度覆盖 */
+    .note-thesis     { border-left-color: #e3c23c; }
+    .note-concept    { border-left-color: #d06a6a; }
+    .note-evidence   { border-left-color: #5b7fc2; }
+    .note-concession { border-left-color: #5f9e5f; }
+    .note-method     { border-left-color: #8d6bb8; }
+    .note-no { font-size: .74rem; color: var(--muted); margin-bottom: 6px; }
+    .note-field { margin-bottom: 6px; }
+    .note-field b { color: var(--navy); font-weight: 600; }
+    .note-field:last-child { margin-bottom: 0; }
+
+    /* 底部论证总览 */
+    .overview {
+      max-width: 1280px; margin: 24px auto 0; padding: 28px 24px 48px;
+      border-top: 3px solid var(--navy);
+    }
+    .overview h2 { color: var(--navy); margin-bottom: 18px; }
+    .skeleton {
+      display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
+    }
+    .sk-step {
+      background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--navy);
+      border-radius: 8px; padding: 12px 10px;
+    }
+    .sk-num {
+      display: inline-block; width: 22px; height: 22px; line-height: 22px;
+      border-radius: 50%; background: var(--navy); color: #fff;
+      text-align: center; font-size: .72rem; margin-bottom: 6px;
+    }
+    .sk-step h4 { font-size: .86rem; margin-bottom: 4px; color: var(--navy); }
+    .sk-step p { font-size: .78rem; color: #555; }
+    .verdicts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+    .verdict {
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px; font-size: .86rem;
+    }
+    .verdict b { display: block; margin-bottom: 4px; color: var(--navy); }
+    .verdict-thesis { border-left: 4px solid #e3c23c; }
+    .verdict-strong { border-left: 4px solid #5f9e5f; }
+    .verdict-weak   { border-left: 4px solid #d06a6a; }
+    .demo-footer {
+      max-width: 1280px; margin: 0 auto; padding: 0 24px 32px;
+      font-size: .78rem; color: var(--muted);
+    }
+
+    :root {
+      --navy: #1c2b4a;
+      --paper: #faf7f0;
+      --ink: #2b2b2b;
+      --muted: #6b6b6b;
+      --hl-thesis: #ffe9a8;
+      --hl-concept: #ffd3d3;
+      --hl-evidence: #cfe0ff;
+      --hl-concession: #cdeec9;
+      --hl-method: #e3d3f7;
+      --trans-bg: #f0ece2;
+      --trans-bar: #b8ab8f;
+      --card-bg: #fdfcf8;
+      --border: #e5dfd0;
+    }
+
+    /* 响应式：移动端单栏，每节批注集中在该节段落之后 */
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .skeleton { grid-template-columns: repeat(2, 1fr); }
+      .verdicts { grid-template-columns: 1fr; }
+      .topbar { padding: 16px; }
+    }
+
+    /* 打印：去导航、单栏、不跨页断段 */
+    @media print {
+      .topbar, .secnav, .demo-banner { display: none; }
+      body { background: #fff; }
+      .grid { grid-template-columns: 1fr; }
+      .passage, .note, .sk-step, .verdict { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="title-wrap">
+      <h1>Attention Is All You Need</h1>
+      <div class="meta">Ashish Vaswani 等 · NeurIPS 2017 · <a href="https://arxiv.org/abs/1706.03762">arXiv:1706.03762</a></div>
+    </div>
+    <ul class="legend">
+      <li><span class="chip hl-thesis">核心论点</span></li>
+      <li><span class="chip hl-concept">关键概念</span></li>
+      <li><span class="chip hl-evidence">证据数据</span></li>
+      <li><span class="chip hl-concession">让步/反驳</span></li>
+      <li><span class="chip hl-method">方法论</span></li>
+    </ul>
+  </header>
+
+  <div class="demo-banner">
+    示例页：仅节选《Attention Is All You Need》的摘要与引言，用于展示版式与标注方式。实际运行 ReadPapers 时会覆盖论文全文的每一个章节。
+  </div>
+
+  <nav class="secnav">
+    <a href="#abstract">摘要</a>
+    <a href="#intro">引言（节选）</a>
+    <a href="#overview">论证总览</a>
+  </nav>
+
+  <main>
+    <section class="sec" id="abstract">
+      <h2 class="sec-title">摘要</h2>
+      <div class="grid">
+        <div class="col-en">
+          <div class="passage" id="p1">
+            <p class="en">The dominant sequence transduction models are based on <span class="hl-concept">complex recurrent or convolutional neural networks</span> in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an <span class="hl-concept">attention mechanism</span>.</p>
+            <div class="trans">主流的序列转导模型建立在编码器—解码器架构之上，依赖复杂的循环或卷积神经网络。表现最好的模型还会通过注意力机制连接编码器与解码器。</div>
+          </div>
+
+          <div class="passage" id="p2">
+            <p class="en"><span class="hl-thesis">We propose a new simple network architecture, the Transformer, based solely on attention mechanisms</span>, <span class="hl-method">dispensing with recurrence and convolutions entirely</span>.</p>
+            <div class="trans">我们提出一种全新而简洁的网络架构——Transformer，它完全建立在注意力机制之上，彻底舍弃了循环与卷积。</div>
+          </div>
+
+          <div class="passage" id="p3">
+            <p class="en"><span class="hl-evidence">Experiments on two machine translation tasks</span> show these models to be <span class="hl-thesis">superior in quality while being more parallelizable and requiring significantly less time to train</span>. Our model achieves <span class="hl-evidence">28.4 BLEU on the WMT 2014 English-to-German translation task</span>, improving over the existing best results, <span class="hl-evidence">including ensembles by over 2 BLEU</span>. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art <span class="hl-evidence">BLEU score of 41.8</span> after training for <span class="hl-evidence">3.5 days on eight GPUs</span>, <span class="hl-evidence">a small fraction of the training costs of the best models from the literature</span>.</p>
+            <div class="trans">在两个机器翻译任务上的实验表明，这类模型的质量更优，同时更易并行、训练时间显著更短。我们的模型在 WMT 2014 英德翻译任务上取得 28.4 BLEU，超过此前最佳结果（包括集成模型）2 BLEU 以上。在 WMT 2014 英法翻译任务上，模型在 8 块 GPU 上训练 3.5 天后，取得 41.8 BLEU 的单模型新纪录——这只是文献中最佳模型训练成本的一小部分。</div>
+          </div>
+
+          <div class="passage" id="p4">
+            <p class="en">We show that the Transformer <span class="hl-thesis">generalizes well to other tasks</span> by applying it successfully to <span class="hl-method">English constituency parsing</span> both with large and limited training data.</p>
+            <div class="trans">我们还把 Transformer 成功应用于英语成分句法分析，分别使用大规模与有限规模的训练数据，说明它能较好地泛化到其他任务。</div>
+          </div>
+        </div>
+
+        <div class="col-notes">
+          <aside class="note note-concept" data-for="p1">
+            <div class="note-no">¶ p1</div>
+            <div class="note-field"><b>功能</b> 引出问题，确立背景。</div>
+            <div class="note-field"><b>逻辑角色</b> 论证链的起点：先划出「主流做法」的边界，为后文替换它做铺垫。</div>
+            <div class="note-field"><b>技巧或漏洞</b> 用 <i>dominant</i> 与 <i>best performing</i> 两个最高级断言建立共识基础，但摘要没有给出比较范围与支撑数据。</div>
+          </aside>
+
+          <aside class="note note-thesis" data-for="p2">
+            <div class="note-no">¶ p2</div>
+            <div class="note-field"><b>功能</b> 提出核心论点。</div>
+            <div class="note-field"><b>逻辑角色</b> 全文主张的凝结点：用「solely / entirely」承诺架构层面的彻底替换。</div>
+            <div class="note-field"><b>技巧或漏洞</b> 主张强度极高：<i>solely</i>、<i>entirely</i> 意味着任何残留的循环或卷积组件都会构成反例，后文必须以完整架构交代来兑现。</div>
+          </aside>
+
+          <aside class="note note-evidence" data-for="p3">
+            <div class="note-no">¶ p3</div>
+            <div class="note-field"><b>功能</b> 提供证据，量化收益。</div>
+            <div class="note-field"><b>逻辑角色</b> 把 p2 的架构主张落到可核对的质量与成本指标上。</div>
+            <div class="note-field"><b>技巧或漏洞</b> 比较对象是「existing best results, including ensembles」——即用单模型对比含集成的基线，优势口径需在正文确认；训练成本只给「eight GPUs」而未说明 GPU 型号与并行设置，跨模型比较时条件未必对齐。</div>
+          </aside>
+
+          <aside class="note note-thesis" data-for="p4">
+            <div class="note-no">¶ p4</div>
+            <div class="note-field"><b>功能</b> 扩展主张的适用范围。</div>
+            <div class="note-field"><b>逻辑角色</b> 把结论从翻译推广到其他任务，试图说明方法并非任务特化。</div>
+            <div class="note-field"><b>技巧或漏洞</b> <i>generalizes well</i> 由单一任务（英语成分句法分析）支撑，摘要未给出该任务的指标或基线；<i>large and limited training data</i> 也没有量化数据规模。</div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="intro">
+      <h2 class="sec-title">引言（节选）</h2>
+      <div class="grid">
+        <div class="col-en">
+          <div class="passage" id="p5">
+            <p class="en"><span class="hl-concept">Recurrent neural networks</span>, long short-term memory [13] and gated recurrent [7] neural networks in particular, have been firmly established as <span class="hl-thesis">state of the art approaches in sequence modeling and transduction problems</span> such as language modeling and machine translation [35, 2, 5]. Numerous efforts have since continued to push the boundaries of recurrent language models and encoder-decoder architectures [38, 24, 15].</p>
+            <div class="trans">循环神经网络——尤其是长短期记忆网络 [13] 与门控循环神经网络 [7]——已被牢固确立为序列建模与转导问题（如语言建模和机器翻译 [35, 2, 5]）的最先进方法。此后大量工作不断拓展循环语言模型与编码器—解码器架构的边界 [38, 24, 15]。</div>
+          </div>
+
+          <div class="passage" id="p6">
+            <p class="en">Recurrent models typically factor computation along the symbol positions of the input and output sequences. Aligning the positions to steps in computation time, they generate a sequence of <span class="hl-concept">hidden states</span> h<sub>t</sub>, as a function of the previous hidden state h<sub>t−1</sub> and the input for position t. This <span class="hl-concept">inherently sequential nature</span> <span class="hl-method">precludes parallelization within training examples</span>, which becomes critical at longer sequence lengths, as memory constraints limit batching across examples. Recent work has achieved significant improvements in computational efficiency through factorization tricks [21] and conditional computation [32], while also improving model performance in case of the latter. <span class="hl-concession">The fundamental constraint of sequential computation, however, remains.</span></p>
+            <div class="trans">循环模型通常沿输入与输出序列的符号位置分解计算。它们把位置对齐到计算时间步，生成一串隐藏状态 h<sub>t</sub>，其取值取决于上一隐藏状态 h<sub>t−1</sub> 与位置 t 的输入。这种固有的顺序性使得训练样本内部无法并行，而在序列变长时尤为关键，因为显存限制会制约跨样本的批处理。近期工作通过分解技巧 [21] 与条件计算 [32] 显著提升了计算效率，后者还改善了模型性能。然而，顺序计算的根本约束依然存在。</div>
+          </div>
+
+          <div class="passage" id="p7">
+            <p class="en"><span class="hl-concept">Attention mechanisms</span> have become an integral part of compelling sequence modeling and transduction models in various tasks, <span class="hl-method">allowing modeling of dependencies without regard to their distance in the input or output sequences</span> [2, 19]. <span class="hl-concession">In all but a few cases [27], however, such attention mechanisms are used in conjunction with a recurrent network.</span></p>
+            <div class="trans">注意力机制已成为各类任务中优秀序列建模与转导模型不可或缺的一部分，它使模型能够忽略输入或输出序列中的距离来建模依赖关系 [2, 19]。然而，除少数情况 [27] 外，这类注意力机制都是与循环网络结合使用的。</div>
+          </div>
+
+          <div class="passage" id="p8">
+            <p class="en"><span class="hl-thesis">In this work we propose the Transformer, a model architecture eschewing recurrence and instead relying entirely on an attention mechanism to draw global dependencies between input and output.</span> The Transformer <span class="hl-method">allows for significantly more parallelization</span> and can reach <span class="hl-evidence">a new state of the art in translation quality after being trained for as little as twelve hours on eight P100 GPUs</span>.</p>
+            <div class="trans">在本工作中，我们提出 Transformer：这一模型架构摒弃循环，完全依赖注意力机制来刻画输入与输出之间的全局依赖。Transformer 允许显著更高的并行度，并且在 8 块 P100 GPU 上训练最短仅需 12 小时，就能达到翻译质量的新最先进水平。</div>
+          </div>
+        </div>
+
+        <div class="col-notes">
+          <aside class="note note-concept" data-for="p5">
+            <div class="note-no">¶ p5</div>
+            <div class="note-field"><b>功能</b> 建立背景，承认现有范式。</div>
+            <div class="note-field"><b>逻辑角色</b> 先承认循环网络的主流地位，为下文「但是」式的转折蓄势。</div>
+            <div class="note-field"><b>技巧或漏洞</b> 以引用集群 [35, 2, 5] 支撑 <i>firmly established</i>，共识由引用密度而非论证建立；这是领域惯例，但也意味着「主流」的边界取决于所引文献的时间窗。</div>
+          </aside>
+
+          <aside class="note note-concession" data-for="p6">
+            <div class="note-no">¶ p6</div>
+            <div class="note-field"><b>功能</b> 指出缺陷，并处理已有的局部补救。</div>
+            <div class="note-field"><b>逻辑角色</b> 问题的技术化表述：顺序计算 → 样本内不可并行 → 长序列瓶颈。</div>
+            <div class="note-field"><b>技巧或漏洞</b> 先列举 factorization tricks 与 conditional computation 的改进，再以 <i>however</i> 将它们归为局部修补，从而把「根本约束」留给自己解决——先让步后收束的典型写法；但「根本」一词没有给出判定标准。</div>
+          </aside>
+
+          <aside class="note note-concession" data-for="p7">
+            <div class="note-no">¶ p7</div>
+            <div class="note-field"><b>功能</b> 让步与反驳处理。</div>
+            <div class="note-field"><b>逻辑角色</b> 承认注意力并非新事物，但指出它此前只是循环网络的附属组件，为「单独使用注意力」的主张清出空间。</div>
+            <div class="note-field"><b>技巧或漏洞</b> <i>In all but a few cases</i> 用单篇文献 [27] 概括全部例外，例外范围与条件未展开；这是以模糊量词压缩反例，读者需回 [27] 核对「few」到底指什么。</div>
+          </aside>
+
+          <aside class="note note-thesis" data-for="p8">
+            <div class="note-no">¶ p8</div>
+            <div class="note-field"><b>功能</b> 重申论点，并给出成本承诺。</div>
+            <div class="note-field"><b>逻辑角色</b> 引言的落点：把摘要中的架构主张具体化为可检验的并行度与训练成本。</div>
+            <div class="note-field"><b>技巧或漏洞</b> 这里的「twelve hours on eight P100 GPUs」与摘要的「3.5 days on eight GPUs」是不同实验设定（摘要该句对应英法任务），节选未交代口径差异；跨节引用训练成本时，必须回原文核对模型规模与任务。</div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="overview" id="overview">
+    <h2>论证结构总览</h2>
+    <div class="skeleton">
+      <div class="sk-step"><div class="sk-num">1</div><h4>问题</h4><p>循环与卷积架构的顺序计算无法在训练样本内并行，长序列时受显存限制，成为效率瓶颈。</p></div>
+      <div class="sk-step"><div class="sk-num">2</div><h4>论点</h4><p>仅依赖注意力机制的 Transformer 可以完全舍弃循环与卷积，同时提升翻译质量与并行度。</p></div>
+      <div class="sk-step"><div class="sk-num">3</div><h4>方法</h4><p>以注意力机制直接刻画输入与输出之间的全局依赖，不再借助循环或卷积。</p></div>
+      <div class="sk-step"><div class="sk-num">4</div><h4>证据</h4><p>WMT14 英德 28.4 BLEU（超此前最佳含集成 2 BLEU 以上）；英法 41.8 BLEU；8 GPU 训练 3.5 天；引言称 8 块 P100 上最快 12 小时达到新 SOTA。</p></div>
+      <div class="sk-step"><div class="sk-num">5</div><h4>反驳/让步</h4><p>承认注意力此前通常与循环网络结合，顺序计算的根本约束仍在；作者以「少数例外」与局部改进界定自己的创新空间。</p></div>
+      <div class="sk-step"><div class="sk-num">6</div><h4>结论</h4><p>注意力可以独立构成强序列转导模型：质量更高、更易并行、训练成本更低，并可迁移到其他任务。</p></div>
+    </div>
+    <div class="verdicts">
+      <div class="verdict verdict-thesis"><b>核心主张（一句话）</b>去掉循环与卷积、只保留注意力的 Transformer，能在翻译质量、并行度和训练成本三方面同时胜出。</div>
+      <div class="verdict verdict-strong"><b>论证最强处</b>摘要把主张直接落到可核对的数字上：28.4 / 41.8 BLEU、超过含集成基线 2 BLEU 以上、8 GPU 3.5 天，证据与主张的对应关系清晰。</div>
+      <div class="verdict verdict-weak"><b>论证最弱处</b>「generalizes well to other tasks」仅以英语成分句法分析一项任务佐证，节选未给出该任务指标；12 小时与 3.5 天两个训练成本来自不同设定，引用时需核对条件。</div>
+    </div>
+  </section>
+
+  <footer class="demo-footer">
+    示例由 ReadPapers 生成 · 原文：Vaswani et al., “Attention Is All You Need”, NeurIPS 2017 · 仅节选摘要与引言
+  </footer>
+</body>
+</html>
