@@ -4,10 +4,12 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+**在线主页**: [tsingke.github.io/ReadPapers](https://tsingke.github.io/ReadPapers/)
+
 > 不输出摘要。摘要把论证结构再压平一次，正确、完整、且毫无用处。
 > ReadPapers 输出的是标注：给论文每一句话贴上论证标签，逼着读者判断——这句是在立论、在给证据，还是在打太极。
 
-![ReadPapers 示例预览](docs/preview.png)
+![ReadPapers 示例预览](docs/preview.webp)
 
 ## 它解决什么问题
 
@@ -97,6 +99,7 @@ git clone https://github.com/tsingke/ReadPapers.git ~/.claude/skills/ReadPapers
 
 ```text
 ReadPapers/
+├── index.html                # GitHub Pages 项目主页（中英双语、明暗主题）
 ├── SKILL.md                  # 技能定义：流程、铁律、交付方式
 ├── references/
 │   ├── prompt.md             # 生成提示词与验收标准
@@ -104,11 +107,20 @@ ReadPapers/
 ├── examples/
 │   └── demo.html             # 示例批注网页
 ├── docs/
-│   └── preview.png           # 示例预览图
+│   ├── preview.webp          # 完整示例预览
+│   ├── hero.webp             # 主页首屏截图
+│   ├── demo-top.webp         # 桌面端双栏截图
+│   ├── demo-bottom.webp      # 论证总览截图
+│   ├── mobile.webp           # 移动端截图
+│   ├── og.png                # 社交分享卡片
+│   ├── favicon.svg           # 站点图标
+│   └── fonts/                # 自托管字体与 OFL 许可
 ├── README.md
 ├── LICENSE
 └── .gitignore
 ```
+
+主页为单文件静态页，字体与图片全部自托管，不依赖 CDN。
 
 ## 不装 Claude Code 也能用
 
@@ -129,3 +141,5 @@ ReadPapers/
 ## License
 
 [MIT](LICENSE)
+
+主页字体使用 IBM Plex Sans、IBM Plex Mono 与 Lora，均遵循 SIL Open Font License 1.1，许可文件见 `docs/fonts/`。

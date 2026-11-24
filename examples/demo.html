@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Attention Is All You Need — 双栏批注阅读（示例）</title>
+  <title>Attention Is All You Need · 双栏批注阅读（示例）</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -197,17 +197,17 @@
         <div class="col-en">
           <div class="passage" id="p1">
             <p class="en">The dominant sequence transduction models are based on <span class="hl-concept">complex recurrent or convolutional neural networks</span> in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an <span class="hl-concept">attention mechanism</span>.</p>
-            <div class="trans">主流的序列转导模型建立在编码器—解码器架构之上，依赖复杂的循环或卷积神经网络。表现最好的模型还会通过注意力机制连接编码器与解码器。</div>
+            <div class="trans">主流的序列转导模型建立在编码器-解码器架构之上，依赖复杂的循环或卷积神经网络。表现最好的模型还会通过注意力机制连接编码器与解码器。</div>
           </div>
 
           <div class="passage" id="p2">
             <p class="en"><span class="hl-thesis">We propose a new simple network architecture, the Transformer, based solely on attention mechanisms</span>, <span class="hl-method">dispensing with recurrence and convolutions entirely</span>.</p>
-            <div class="trans">我们提出一种全新而简洁的网络架构——Transformer，它完全建立在注意力机制之上，彻底舍弃了循环与卷积。</div>
+            <div class="trans">我们提出一种全新而简洁的网络架构：Transformer，它完全建立在注意力机制之上，彻底舍弃了循环与卷积。</div>
           </div>
 
           <div class="passage" id="p3">
             <p class="en"><span class="hl-evidence">Experiments on two machine translation tasks</span> show these models to be <span class="hl-thesis">superior in quality while being more parallelizable and requiring significantly less time to train</span>. Our model achieves <span class="hl-evidence">28.4 BLEU on the WMT 2014 English-to-German translation task</span>, improving over the existing best results, <span class="hl-evidence">including ensembles by over 2 BLEU</span>. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art <span class="hl-evidence">BLEU score of 41.8</span> after training for <span class="hl-evidence">3.5 days on eight GPUs</span>, <span class="hl-evidence">a small fraction of the training costs of the best models from the literature</span>.</p>
-            <div class="trans">在两个机器翻译任务上的实验表明，这类模型的质量更优，同时更易并行、训练时间显著更短。我们的模型在 WMT 2014 英德翻译任务上取得 28.4 BLEU，超过此前最佳结果（包括集成模型）2 BLEU 以上。在 WMT 2014 英法翻译任务上，模型在 8 块 GPU 上训练 3.5 天后，取得 41.8 BLEU 的单模型新纪录——这只是文献中最佳模型训练成本的一小部分。</div>
+            <div class="trans">在两个机器翻译任务上的实验表明，这类模型的质量更优，同时更易并行、训练时间显著更短。我们的模型在 WMT 2014 英德翻译任务上取得 28.4 BLEU，超过此前最佳结果（包括集成模型）2 BLEU 以上。在 WMT 2014 英法翻译任务上，模型在 8 块 GPU 上训练 3.5 天后，取得 41.8 BLEU 的单模型新纪录，而这只是文献中最佳模型训练成本的一小部分。</div>
           </div>
 
           <div class="passage" id="p4">
@@ -235,7 +235,7 @@
             <div class="note-no">¶ p3</div>
             <div class="note-field"><b>功能</b> 提供证据，量化收益。</div>
             <div class="note-field"><b>逻辑角色</b> 把 p2 的架构主张落到可核对的质量与成本指标上。</div>
-            <div class="note-field"><b>技巧或漏洞</b> 比较对象是「existing best results, including ensembles」——即用单模型对比含集成的基线，优势口径需在正文确认；训练成本只给「eight GPUs」而未说明 GPU 型号与并行设置，跨模型比较时条件未必对齐。</div>
+            <div class="note-field"><b>技巧或漏洞</b> 比较对象是「existing best results, including ensembles」，即用单模型对比含集成的基线，优势口径需在正文确认；训练成本只给「eight GPUs」而未说明 GPU 型号与并行设置，跨模型比较时条件未必对齐。</div>
           </aside>
 
           <aside class="note note-thesis" data-for="p4">
@@ -254,7 +254,7 @@
         <div class="col-en">
           <div class="passage" id="p5">
             <p class="en"><span class="hl-concept">Recurrent neural networks</span>, long short-term memory [13] and gated recurrent [7] neural networks in particular, have been firmly established as <span class="hl-thesis">state of the art approaches in sequence modeling and transduction problems</span> such as language modeling and machine translation [35, 2, 5]. Numerous efforts have since continued to push the boundaries of recurrent language models and encoder-decoder architectures [38, 24, 15].</p>
-            <div class="trans">循环神经网络——尤其是长短期记忆网络 [13] 与门控循环神经网络 [7]——已被牢固确立为序列建模与转导问题（如语言建模和机器翻译 [35, 2, 5]）的最先进方法。此后大量工作不断拓展循环语言模型与编码器—解码器架构的边界 [38, 24, 15]。</div>
+            <div class="trans">循环神经网络，尤其是长短期记忆网络 [13] 与门控循环神经网络 [7]，已被牢固确立为序列建模与转导问题（如语言建模和机器翻译 [35, 2, 5]）的最先进方法。此后大量工作不断拓展循环语言模型与编码器-解码器架构的边界 [38, 24, 15]。</div>
           </div>
 
           <div class="passage" id="p6">
@@ -285,7 +285,7 @@
             <div class="note-no">¶ p6</div>
             <div class="note-field"><b>功能</b> 指出缺陷，并处理已有的局部补救。</div>
             <div class="note-field"><b>逻辑角色</b> 问题的技术化表述：顺序计算 → 样本内不可并行 → 长序列瓶颈。</div>
-            <div class="note-field"><b>技巧或漏洞</b> 先列举 factorization tricks 与 conditional computation 的改进，再以 <i>however</i> 将它们归为局部修补，从而把「根本约束」留给自己解决——先让步后收束的典型写法；但「根本」一词没有给出判定标准。</div>
+            <div class="note-field"><b>技巧或漏洞</b> 先列举 factorization tricks 与 conditional computation 的改进，再以 <i>however</i> 将它们归为局部修补，从而把「根本约束」留给自己解决，这是先让步后收束的典型写法；但「根本」一词没有给出判定标准。</div>
           </aside>
 
           <aside class="note note-concession" data-for="p7">

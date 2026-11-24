@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-lang="zh" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReadPapers · 把论文 PDF 变成双栏批注网页</title>
+  <meta name="description" content="ReadPapers 是 Claude Code 技能：把学术论文 PDF 变成英中双栏、五色标注、逐段批注的单文件 HTML 网页。">
+  <meta name="theme-color" content="#f6f2e9">
+  <link rel="canonical" href="https://tsingke.github.io/ReadPapers/">
+  <link rel="icon" href="docs/favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ReadPapers · 把论文 PDF 变成双栏批注网页">
+  <meta property="og:description" content="把学术论文 PDF 变成英中双栏、五色论证标注、逐段批注的单文件 HTML 网页。">
+  <meta property="og:url" content="https://tsingke.github.io/ReadPapers/">
+  <meta property="og:image" content="https://tsingke.github.io/ReadPapers/docs/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preload" href="docs/fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="docs/fonts/ibm-plex-sans-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.classList.add('js');
+      try {
+        var theme = localStorage.getItem('rp-theme');
+        if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        root.setAttribute('data-theme', theme);
+        var lang = localStorage.getItem('rp-lang');
+        if (!lang) lang = (navigator.language || 'zh').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+        root.setAttribute('data-lang', lang);
+        root.setAttribute('lang', lang === 'zh' ? 'zh-CN' : 'en');
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    @font-face {
+      font-family: "IBM Plex Sans";
+      src: url("docs/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "IBM Plex Sans";
+      src: url("docs/fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2");
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "IBM Plex Sans";
+      src: url("docs/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2");
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      src: url("docs/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Lora";
+      src: url("docs/fonts/lora-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Lora";
+      src: url("docs/fonts/lora-latin-400-italic.woff2") format("woff2");
+      font-weight: 400;
+      font-style: italic;
+      font-display: swap;
+    }
+
+    :root {
+      color-scheme: light;
+      --paper: #f6f2e9;
+      --surface: #fffdf7;
+      --surface-2: #eee8db;
+      --ink: #172132;
+      --ink-soft: #46505e;
+      --muted: #6d6a62;
+      --line: #ddd5c6;
+      --line-strong: #c7bda9;
+      --accent: #1f3a5f;
+      --accent-hover: #162c49;
+      --accent-contrast: #f8f4ea;
+      --accent-soft: #e3ebf6;
+      --dot-thesis: #d9b32f;
+      --dot-concept: #d06a6a;
+      --dot-evidence: #5b7fc2;
+      --dot-concession: #5f9e5f;
+      --dot-method: #8d6bb8;
+      --hl-thesis: #ffe9a8;
+      --hl-concept: #ffd3d3;
+      --hl-evidence: #cfe0ff;
+      --hl-concession: #cdeec9;
+      --hl-method: #e3d3f7;
+      --terminal-bg: #1b2430;
+      --terminal-ink: #e9e5da;
+      --terminal-muted: #98a2b3;
+      --shadow: 0 30px 80px -40px rgba(40, 35, 25, 0.45);
+      --shadow-soft: 0 16px 40px -28px rgba(40, 35, 25, 0.35);
+      --radius-card: 16px;
+      --radius-control: 10px;
+      --radius-pill: 999px;
+      --max: 1240px;
+      --gutter: clamp(20px, 4vw, 40px);
+      --section: clamp(72px, 9vw, 124px);
+      --font-ui: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --font-reading: "Lora", Georgia, "Songti SC", "Noto Serif CJK SC", serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --paper: #0f1319;
+      --surface: #161b24;
+      --surface-2: #1d232e;
+      --ink: #ece8dd;
+      --ink-soft: #b9bcc2;
+      --muted: #8e929a;
+      --line: #28303c;
+      --line-strong: #3a4454;
+      --accent: #9db8e8;
+      --accent-hover: #b8cdf2;
+      --accent-contrast: #0f141c;
+      --accent-soft: #1b2a40;
+      --dot-thesis: #e6c44a;
+      --dot-concept: #e08a8a;
+      --dot-evidence: #83a7ea;
+      --dot-concession: #7fc47c;
+      --dot-method: #b797dd;
+      --hl-thesis: #4a3f12;
+      --hl-concept: #4a2323;
+      --hl-evidence: #1d3357;
+      --hl-concession: #21401f;
+      --hl-method: #3a2a4f;
+      --terminal-bg: #0a0e14;
+      --terminal-ink: #e9e5da;
+      --terminal-muted: #8b95a7;
+      --shadow: 0 30px 80px -40px rgba(0, 0, 0, 0.85);
+      --shadow-soft: 0 16px 40px -28px rgba(0, 0, 0, 0.7);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--font-ui);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      transition: background-color 0.35s ease, color 0.35s ease;
+    }
+
+    img { max-width: 100%; height: auto; display: block; }
+    a { color: inherit; }
+    button { font: inherit; color: inherit; }
+    [hidden] { display: none !important; }
+    ::selection { background: var(--hl-thesis); color: #172132; }
+
+    :focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* Language visibility */
+    html[data-lang="zh"] .l-en { display: none !important; }
+    html[data-lang="en"] .l-zh { display: none !important; }
+
+    .skip-link {
+      position: absolute;
+      left: 16px;
+      top: -100px;
+      z-index: 100;
+      padding: 10px 16px;
+      background: var(--ink);
+      color: var(--paper);
+      border-radius: var(--radius-control);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .skip-link:focus { top: 12px; }
+
+    .wrap {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 var(--gutter);
+    }
+
+    /* Navigation */
+    .site-nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 var(--gutter);
+      height: 68px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.02rem;
+      letter-spacing: -0.02em;
+      flex: none;
+    }
+    .brand img { width: 26px; height: 26px; border-radius: 7px; }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .nav-links a {
+      color: var(--ink-soft);
+      text-decoration: none;
+      font-size: 0.9rem;
+      padding: 8px 11px;
+      border-radius: 8px;
+      transition: background-color 0.18s ease, color 0.18s ease;
+      white-space: nowrap;
+    }
+    .nav-links a:hover,
+    .nav-links a.active {
+      color: var(--ink);
+      background: var(--surface-2);
+    }
+    .nav-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: none;
+    }
+    .seg {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-pill);
+    }
+    .seg button {
+      border: 0;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 0.78rem;
+      line-height: 1;
+      padding: 6px 9px;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      transition: background-color 0.18s ease, color 0.18s ease;
+    }
+    .seg button[aria-pressed="true"] {
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .theme-btn,
+    .gh-link,
+    .menu-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 7px 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-control);
+      background: transparent;
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 0.82rem;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+    .theme-btn:hover,
+    .gh-link:hover,
+    .menu-btn:hover { background: var(--surface-2); border-color: var(--line-strong); }
+    .theme-btn:active,
+    .gh-link:active,
+    .menu-btn:active { transform: translateY(1px); }
+    html[data-theme="light"] [data-theme-label="dark"],
+    html[data-theme="dark"] [data-theme-label="light"] { display: none !important; }
+    .menu-btn { display: none; }
+    .menu-btn[aria-expanded="false"] .when-open { display: none !important; }
+    .menu-btn[aria-expanded="true"] .when-closed { display: none !important; }
+    .mobile-only { display: none; }
+
+    /* Shared controls */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 46px;
+      padding: 12px 19px;
+      border-radius: var(--radius-control);
+      border: 1px solid transparent;
+      font-size: 0.95rem;
+      font-weight: 500;
+      line-height: 1;
+      text-decoration: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, color 0.18s ease;
+    }
+    .btn:active { transform: translateY(1px) scale(0.995); }
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-contrast);
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--line-strong);
+      color: var(--ink);
+    }
+    .btn-ghost:hover { background: var(--surface-2); }
+
+    /* Hero */
+    .hero { padding: clamp(40px, 6vh, 78px) 0 clamp(56px, 7vw, 96px); }
+    .hero-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 var(--gutter);
+      display: grid;
+      grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+      gap: clamp(32px, 5vw, 72px);
+      align-items: center;
+    }
+    .hero-copy { max-width: 600px; }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .colorbar { display: inline-flex; width: 54px; height: 4px; border-radius: 2px; overflow: hidden; }
+    .colorbar span { flex: 1; }
+    .colorbar span:nth-child(1) { background: var(--dot-thesis); }
+    .colorbar span:nth-child(2) { background: var(--dot-concept); }
+    .colorbar span:nth-child(3) { background: var(--dot-evidence); }
+    .colorbar span:nth-child(4) { background: var(--dot-concession); }
+    .colorbar span:nth-child(5) { background: var(--dot-method); }
+
+    .hero h1 {
+      font-size: clamp(2.45rem, 4.4vw, 3.8rem);
+      line-height: 1.04;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      margin: 18px 0 20px;
+      max-width: 600px;
+    }
+    .hero h1 .h1-line { display: block; }
+    html[data-lang="zh"] .hero h1 {
+      font-size: clamp(2.7rem, 5.2vw, 3.85rem);
+      letter-spacing: -0.02em;
+      line-height: 1.16;
+      max-width: none;
+    }
+    .hero-sub {
+      color: var(--ink-soft);
+      font-size: clamp(1rem, 1.5vw, 1.1rem);
+      line-height: 1.75;
+      max-width: 46ch;
+    }
+    html[data-lang="zh"] .hero-sub { max-width: 34ch; }
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+    .hero-media { margin: 0; }
+    .shot-frame {
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-card);
+      padding: 8px;
+      box-shadow: var(--shadow);
+    }
+    .shot-frame img {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      object-position: top;
+      border-radius: calc(var(--radius-card) - 7px);
+      background: var(--surface-2);
+    }
+    .hero-media figcaption,
+    .shot-lg figcaption,
+    .shot-wide figcaption,
+    .phone-wrap figcaption {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    /* Sections */
+    .section { padding: var(--section) 0; }
+    .section-alt {
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .sec-head { max-width: 760px; }
+    .sec-head h2 {
+      font-size: clamp(1.85rem, 3.4vw, 2.9rem);
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+    html[data-lang="zh"] .sec-head h2 { letter-spacing: -0.01em; line-height: 1.2; }
+    .sec-lead {
+      margin-top: 16px;
+      color: var(--ink-soft);
+      max-width: 62ch;
+      font-size: 1.02rem;
+      line-height: 1.75;
+    }
+    html[data-lang="zh"] .sec-lead { max-width: 44ch; }
+
+    /* Comparison */
+    .compare {
+      margin-top: 42px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+    .tab {
+      border: 0;
+      background: transparent;
+      color: var(--ink-soft);
+      padding: 8px 14px;
+      border-radius: var(--radius-pill);
+      font-size: 0.86rem;
+      cursor: pointer;
+      transition: background-color 0.18s ease, color 0.18s ease;
+    }
+    .tab[aria-selected="true"] {
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    }
+    .panel-col { padding: clamp(24px, 3.6vw, 42px); }
+    .panel-col + .panel-col { border-left: 1px solid var(--line); }
+    .panel-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .source-text {
+      font-family: var(--font-reading);
+      font-size: clamp(1rem, 1.35vw, 1.08rem);
+      line-height: 1.95;
+      text-align: justify;
+    }
+    .summary-text {
+      font-size: clamp(1.08rem, 1.6vw, 1.25rem);
+      line-height: 1.7;
+      color: var(--ink);
+    }
+    .panel-foot {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    .note-stack { display: grid; gap: 12px; }
+    .note-card {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--line-strong);
+      border-radius: var(--radius-control);
+      padding: 12px 14px;
+      font-size: 0.88rem;
+      line-height: 1.65;
+      background: var(--paper);
+    }
+    .note-card b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
+    .note-card span { color: var(--ink-soft); }
+    .note-thesis { border-left-color: var(--dot-thesis); }
+    .note-concept { border-left-color: var(--dot-concept); }
+    .note-method { border-left-color: var(--dot-method); }
+
+    /* Highlights */
+    .hl { padding: 0 4px; border-radius: 4px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+    .hl-thesis { background: var(--hl-thesis); }
+    .hl-concept { background: var(--hl-concept); }
+    .hl-evidence { background: var(--hl-evidence); }
+    .hl-concession { background: var(--hl-concession); }
+    .hl-method { background: var(--hl-method); }
+
+    /* Colors */
+    .colors-layout {
+      margin-top: 42px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.85fr);
+      gap: clamp(20px, 3vw, 32px);
+      align-items: start;
+    }
+    .excerpt-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      padding: clamp(24px, 3.6vw, 42px);
+      box-shadow: var(--shadow-soft);
+    }
+    .excerpt-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .excerpt-top .panel-label { margin-bottom: 0; }
+    .text-btn {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink-soft);
+      border-radius: var(--radius-pill);
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    }
+    .text-btn:hover { background: var(--surface-2); color: var(--ink); }
+    .axis-status {
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-bottom: 20px;
+      min-height: 1.4em;
+    }
+    .excerpt { max-width: 72ch; }
+    .excerpt p {
+      font-family: var(--font-reading);
+      font-size: clamp(1rem, 1.35vw, 1.1rem);
+      line-height: 1.95;
+      text-align: justify;
+    }
+    .excerpt p + p { margin-top: 16px; }
+    .excerpt-label {
+      font-family: var(--font-mono) !important;
+      font-size: 0.7rem !important;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 24px !important;
+      text-align: left !important;
+    }
+    .excerpt .gap { color: var(--muted); padding: 0 4px; }
+    .excerpt .hl { transition: opacity 0.22s ease, box-shadow 0.22s ease; }
+    .excerpt[data-focus] .hl { opacity: 0.14; }
+    .excerpt[data-focus="thesis"] .hl-thesis,
+    .excerpt[data-focus="concept"] .hl-concept,
+    .excerpt[data-focus="evidence"] .hl-evidence,
+    .excerpt[data-focus="concession"] .hl-concession,
+    .excerpt[data-focus="method"] .hl-method {
+      opacity: 1;
+      box-shadow: 0 0 0 2px var(--dot-thesis);
+    }
+    .excerpt[data-focus="concept"] .hl-concept { box-shadow: 0 0 0 2px var(--dot-concept); }
+    .excerpt[data-focus="evidence"] .hl-evidence { box-shadow: 0 0 0 2px var(--dot-evidence); }
+    .excerpt[data-focus="concession"] .hl-concession { box-shadow: 0 0 0 2px var(--dot-concession); }
+    .excerpt[data-focus="method"] .hl-method { box-shadow: 0 0 0 2px var(--dot-method); }
+
+    .dims {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .dim-btn {
+      text-align: left;
+      padding: 15px 15px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      cursor: pointer;
+      transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .dim-btn:hover { background: var(--paper); transform: translateY(-2px); }
+    .dim-btn:active { transform: translateY(0); }
+    .dim-btn .dot {
+      display: block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--dot);
+      margin-bottom: 10px;
+    }
+    .dim-btn strong {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .dim-btn .q {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .dim-btn[aria-pressed="true"] {
+      border-color: var(--dot);
+      box-shadow: inset 0 0 0 1px var(--dot);
+      background: var(--paper);
+    }
+
+    /* Workflow */
+    .flow {
+      list-style: none;
+      margin-top: 46px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-top: 1px solid var(--line-strong);
+    }
+    .flow-step {
+      position: relative;
+      padding: 26px 26px 0 0;
+    }
+    .flow-step::before {
+      content: "";
+      position: absolute;
+      top: -5px;
+      left: 0;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .flow-step + .flow-step {
+      padding-left: 26px;
+      border-left: 1px solid var(--line);
+    }
+    .flow-code {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+    .flow-step h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 8px 0 8px;
+      letter-spacing: -0.01em;
+    }
+    .flow-step p {
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      max-width: 30ch;
+    }
+    .rules {
+      margin-top: 52px;
+      padding-top: 26px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .rule strong {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .rule span {
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    /* Demo gallery */
+    .demo-grid {
+      margin-top: 44px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.7fr);
+      gap: clamp(24px, 4vw, 48px);
+      align-items: start;
+    }
+    .shot-lg {
+      margin: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      padding: 10px;
+      box-shadow: var(--shadow);
+    }
+    .shot-lg img {
+      width: 100%;
+      border-radius: calc(var(--radius-card) - 7px);
+      border: 1px solid var(--line);
+    }
+    .phone-wrap { margin: 0; justify-self: center; width: min(100%, 268px); }
+    .phone {
+      background: #1c2430;
+      border: 8px solid #1c2430;
+      border-radius: 30px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .phone img { width: 100%; border-radius: 22px; }
+    .shot-wide {
+      margin: 22px 0 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      padding: 10px;
+      box-shadow: var(--shadow-soft);
+    }
+    .shot-wide img {
+      width: 100%;
+      border-radius: calc(var(--radius-card) - 7px);
+      border: 1px solid var(--line);
+    }
+    .demo-cta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 30px;
+    }
+    .demo-note { color: var(--muted); font-size: 0.85rem; }
+
+    /* Install */
+    .install-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: clamp(28px, 5vw, 64px);
+      align-items: start;
+    }
+    .install-copy h2 {
+      font-size: clamp(1.85rem, 3.4vw, 2.9rem);
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+    html[data-lang="zh"] .install-copy h2 { letter-spacing: -0.01em; line-height: 1.2; }
+    .say {
+      margin-top: 24px;
+      padding: 14px 16px;
+      background: var(--surface-2);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 var(--radius-control) var(--radius-control) 0;
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+    .facts {
+      list-style: none;
+      margin-top: 26px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 24px;
+    }
+    .facts li {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: var(--ink-soft);
+    }
+    .facts b {
+      color: var(--ink);
+      font-weight: 600;
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .terminal {
+      background: var(--terminal-bg);
+      color: var(--terminal-ink);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-card);
+      padding: 16px 18px 18px;
+      box-shadow: var(--shadow-soft);
+    }
+    .terminal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .terminal-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--terminal-muted);
+    }
+    .copy-btn {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--terminal-ink);
+      border-radius: var(--radius-control);
+      padding: 6px 10px;
+      font-size: 0.76rem;
+      cursor: pointer;
+      transition: background-color 0.18s ease, border-color 0.18s ease;
+    }
+    .copy-btn:hover { background: rgba(255, 255, 255, 0.15); }
+    .copy-btn .copied-label { display: none; }
+    .copy-btn[data-copied="true"] .copy-label { display: none; }
+    .copy-btn[data-copied="true"] .copied-label { display: inline; }
+    .terminal pre {
+      margin: 0;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .terminal code {
+      font-family: var(--font-mono);
+      font-size: 0.86rem;
+      line-height: 1.8;
+      color: var(--terminal-ink);
+    }
+    .terminal code .prompt { color: var(--terminal-muted); user-select: none; }
+    .terminal-note {
+      margin-top: 14px;
+      color: var(--terminal-muted);
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    .site-footer {
+      background: var(--paper);
+      border-top: 1px solid var(--line);
+      padding: 44px 0 48px;
+    }
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .footer-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .footer-brand img { width: 22px; height: 22px; border-radius: 6px; }
+    .footer-brand span.muted { color: var(--muted); font-weight: 400; font-size: 0.82rem; letter-spacing: 0; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 6px; }
+    .footer-links a {
+      color: var(--ink-soft);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+    }
+    .footer-links a:hover { background: var(--surface-2); color: var(--ink); }
+    .footer-note {
+      margin-top: 26px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    /* Reveal */
+    html.js .reveal {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    html.js .reveal.in { opacity: 1; transform: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      html.js .reveal { opacity: 1; transform: none; transition: none; }
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 1000px) {
+      .nav-links a { padding: 8px; font-size: 0.86rem; }
+      .hero-inner { grid-template-columns: 1fr; gap: 40px; }
+      .hero-copy { max-width: 640px; }
+      .hero-media { max-width: 720px; }
+      .colors-layout { grid-template-columns: 1fr; }
+      .dims { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .excerpt { max-width: none; }
+    }
+
+    @media (max-width: 900px) {
+      .nav-links {
+        position: absolute;
+        top: 68px;
+        left: 0;
+        right: 0;
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        padding: 12px var(--gutter) 16px;
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        box-shadow: var(--shadow-soft);
+      }
+      .nav-links.open { display: flex; }
+      .nav-links a { padding: 11px 12px; font-size: 0.95rem; }
+      .mobile-only { display: block; }
+      .menu-btn { display: inline-flex; }
+      .panel { grid-template-columns: 1fr; }
+      .panel-col + .panel-col { border-left: 0; border-top: 1px solid var(--line); }
+      .flow { grid-template-columns: 1fr; border-top: 0; }
+      .flow-step { padding: 0 0 24px 22px; border-left: 1px solid var(--line); }
+      .flow-step + .flow-step { padding-left: 22px; border-left: 1px solid var(--line); }
+      .flow-step::before { top: 6px; left: -5px; }
+      .flow-step:last-child { padding-bottom: 0; border-left-color: transparent; }
+      .flow-step:last-child::before { background: var(--line-strong); }
+      .demo-grid { grid-template-columns: 1fr; }
+      .phone-wrap { justify-self: start; width: min(100%, 300px); }
+      .install-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .gh-link { display: none; }
+      .rules { grid-template-columns: 1fr; gap: 16px; }
+      .facts { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .nav-inner { gap: 12px; height: 64px; }
+      .nav-links { top: 64px; }
+      .brand { font-size: 0.96rem; }
+      .brand img { width: 24px; height: 24px; }
+      .theme-btn { padding: 7px 9px; }
+      .hero { padding-top: 36px; }
+      .hero h1 { max-width: none; }
+      .dims { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .excerpt-top { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .excerpt p, .source-text { text-align: left; }
+      .section { padding: 64px 0; }
+      .panel-col { padding: 22px; }
+      .dims { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .shot-lg { display: none; }
+      .phone-wrap { width: min(100%, 260px); }
+      .demo-cta { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (max-width: 430px) {
+      .hero h1,
+      html[data-lang="zh"] .hero h1 { font-size: 2.2rem; }
+      .hero-cta { flex-direction: column; align-items: stretch; }
+      .hero-cta .btn { width: 100%; }
+      .dims { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .dim-btn:last-child { grid-column: 1 / -1; }
+      .seg button { padding: 6px 7px; }
+      .theme-btn { padding: 7px 8px; font-size: 0.78rem; }
+      .menu-btn { padding: 7px 8px; font-size: 0.78rem; }
+    }
+
+    @media (max-width: 370px) {
+      .brand span { display: none; }
+      .nav-inner { gap: 8px; }
+      .hero h1,
+      html[data-lang="zh"] .hero h1 { font-size: 1.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main"><span class="l-zh">跳到主要内容</span><span class="l-en">Skip to content</span></a>
+
+  <header class="site-nav">
+    <div class="nav-inner">
+      <a class="brand" href="#top" aria-label="ReadPapers">
+        <img src="docs/favicon.svg" alt="" width="26" height="26">
+        <span>ReadPapers</span>
+      </a>
+
+      <nav class="nav-links" id="navLinks" aria-label="主导航">
+        <a href="#why"><span class="l-zh">为什么</span><span class="l-en">Why</span></a>
+        <a href="#colors"><span class="l-zh">五色系统</span><span class="l-en">Colors</span></a>
+        <a href="#workflow"><span class="l-zh">工作流</span><span class="l-en">Workflow</span></a>
+        <a href="#demo"><span class="l-zh">示例</span><span class="l-en">Demo</span></a>
+        <a href="#install"><span class="l-zh">安装</span><span class="l-en">Install</span></a>
+        <a class="mobile-only" href="https://github.com/tsingke/ReadPapers">GitHub</a>
+      </nav>
+
+      <div class="nav-actions">
+        <div class="seg" role="group" aria-label="语言 / Language">
+          <button type="button" data-set-lang="zh" aria-pressed="true">中</button>
+          <button type="button" data-set-lang="en" aria-pressed="false">EN</button>
+        </div>
+        <button class="theme-btn" type="button" id="themeToggle" aria-pressed="false" aria-label="切换到深色主题">
+          <span class="l-zh" data-theme-label="light">深色</span>
+          <span class="l-en" data-theme-label="light">Dark</span>
+          <span class="l-zh" data-theme-label="dark">浅色</span>
+          <span class="l-en" data-theme-label="dark">Light</span>
+        </button>
+        <a class="gh-link" href="https://github.com/tsingke/ReadPapers">GitHub</a>
+        <button class="menu-btn" type="button" id="menuBtn" aria-expanded="false" aria-controls="navLinks">
+          <span class="when-closed"><span class="l-zh">菜单</span><span class="l-en">Menu</span></span>
+          <span class="when-open"><span class="l-zh">关闭</span><span class="l-en">Close</span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <div class="kicker">
+            <span class="colorbar" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></span>
+            <span class="l-zh">Claude Code 技能</span>
+            <span class="l-en">Claude Code skill</span>
+          </div>
+          <h1>
+            <span class="l-zh">读论证，不读摘要。</span>
+            <span class="l-en"><span class="h1-line">Read the argument.</span><span class="h1-line">Not the summary.</span></span>
+          </h1>
+          <p class="hero-sub">
+            <span class="l-zh">把论文 PDF 变成英中双栏、五色标注、逐段批注的单文件网页。</span>
+            <span class="l-en">Turn a paper PDF into a bilingual, five-color annotated reading page.</span>
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="examples/demo.html">
+              <span class="l-zh">打开示例</span><span class="l-en">Open the demo</span>
+              <span aria-hidden="true">→</span>
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/tsingke/ReadPapers">
+              <span class="l-zh">GitHub 仓库</span><span class="l-en">GitHub repository</span>
+            </a>
+          </div>
+        </div>
+
+        <figure class="hero-media">
+          <div class="shot-frame">
+            <img src="docs/hero.webp" width="1200" height="900" alt="ReadPapers 生成的论文批注网页截图 / annotated paper page preview" fetchpriority="high">
+          </div>
+          <figcaption>
+            <span class="l-zh">示例：Attention Is All You Need 的摘要与引言。</span>
+            <span class="l-en">Demo: abstract and introduction of Attention Is All You Need.</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="why">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <h2>
+            <span class="l-zh">摘要把论证压平第二次。</span>
+            <span class="l-en">A summary flattens the argument twice.</span>
+          </h2>
+          <p class="sec-lead">
+            <span class="l-zh">它告诉你论文说了什么，却没有告诉你论文如何说服你。</span>
+            <span class="l-en">It tells you what the paper says. It does not tell you how the paper convinces you.</span>
+          </p>
+        </div>
+
+        <div class="compare reveal">
+          <div class="tabs" role="tablist" aria-label="阅读方式 / Reading mode">
+            <button class="tab" type="button" role="tab" id="tab-summary" aria-controls="panel-summary" aria-selected="false" tabindex="-1">
+              <span class="l-zh">摘要</span><span class="l-en">Summary</span>
+            </button>
+            <button class="tab" type="button" role="tab" id="tab-annotation" aria-controls="panel-annotation" aria-selected="true" tabindex="0">
+              <span class="l-zh">批注</span><span class="l-en">Annotation</span>
+            </button>
+          </div>
+
+          <div class="panel" id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" hidden>
+            <div class="panel-col">
+              <div class="panel-label"><span class="l-zh">原文</span><span class="l-en">Source</span></div>
+              <p class="source-text">The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. ... We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.</p>
+            </div>
+            <div class="panel-col">
+              <div class="panel-label"><span class="l-zh">摘要的产出</span><span class="l-en">What a summary gives you</span></div>
+              <p class="summary-text l-zh">论文提出 Transformer，一种仅依赖注意力机制的架构。</p>
+              <p class="summary-text l-en">The paper proposes the Transformer, an architecture built solely on attention.</p>
+              <p class="panel-foot"><span class="l-zh">信息正确，但论证消失了。</span><span class="l-en">Accurate, but the argument is gone.</span></p>
+            </div>
+          </div>
+
+          <div class="panel" id="panel-annotation" role="tabpanel" aria-labelledby="tab-annotation">
+            <div class="panel-col">
+              <div class="panel-label"><span class="l-zh">原文</span><span class="l-en">Source</span></div>
+              <p class="source-text">The dominant sequence transduction models are based on <span class="hl hl-concept">complex recurrent or convolutional neural networks</span> in an encoder-decoder configuration. ... <span class="hl hl-thesis">We propose a new simple network architecture, the Transformer, based solely on attention mechanisms,</span> <span class="hl hl-method">dispensing with recurrence and convolutions entirely.</span></p>
+            </div>
+            <div class="panel-col">
+              <div class="panel-label"><span class="l-zh">批注的产出</span><span class="l-en">What an annotation gives you</span></div>
+              <div class="note-stack">
+                <div class="note-card note-thesis">
+                  <b><span class="l-zh">功能</span><span class="l-en">Function</span></b>
+                  <span class="l-zh">提出核心论点。</span>
+                  <span class="l-en">States the thesis.</span>
+                </div>
+                <div class="note-card note-concept">
+                  <b><span class="l-zh">逻辑角色</span><span class="l-en">Role</span></b>
+                  <span class="l-zh">全文主张的凝结点，后文的证据都要回到这里。</span>
+                  <span class="l-en">The claim the whole paper hangs on. Every later piece of evidence returns here.</span>
+                </div>
+                <div class="note-card note-method">
+                  <b><span class="l-zh">技巧或漏洞</span><span class="l-en">Technique or weakness</span></b>
+                  <span class="l-zh">「solely」与「entirely」把主张推到最强，任何残留的循环或卷积都会成为反例。</span>
+                  <span class="l-en">"Solely" and "entirely" push the claim to its strongest form. Any residual recurrence or convolution becomes a counterexample.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="colors">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <h2>
+            <span class="l-zh">五色不是装饰，是论证分类。</span>
+            <span class="l-en">Five colors are a classification, not decoration.</span>
+          </h2>
+          <p class="sec-lead">
+            <span class="l-zh">每一句关键内容都要回答一个问题：它在论证里干什么？</span>
+            <span class="l-en">Every key sentence has to answer one question: what is it doing in the argument?</span>
+          </p>
+        </div>
+
+        <div class="colors-layout">
+          <div class="excerpt-card reveal">
+            <div class="excerpt-top">
+            <div class="panel-label"><span class="l-zh">标注示例，句子取自摘要与引言</span><span class="l-en">Annotation sample, sentences from the abstract and introduction</span></div>
+            <button class="text-btn" type="button" id="resetColors">
+              <span class="l-zh">显示全部</span><span class="l-en">Show all</span>
+            </button>
+          </div>
+          <p class="axis-status" aria-live="polite">
+            <span class="l-zh" id="axisZh">当前：全部维度</span>
+            <span class="l-en" id="axisEn">Showing: all dimensions</span>
+          </p>
+
+          <div class="excerpt" id="excerpt">
+            <p>The dominant sequence transduction models are based on <span class="hl hl-concept" data-dim="concept">complex recurrent or convolutional neural networks</span> in an encoder-decoder configuration. <span class="gap">…</span> <span class="hl hl-thesis" data-dim="thesis">We propose a new simple network architecture, the Transformer, based solely on attention mechanisms</span>, <span class="hl hl-method" data-dim="method">dispensing with recurrence and convolutions entirely</span>. <span class="gap">…</span> <span class="hl hl-evidence" data-dim="evidence">Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task,</span> improving over the existing best results, including ensembles by over 2 BLEU.</p>
+            <p class="excerpt-label"><span class="l-zh">引言</span><span class="l-en">Introduction</span></p>
+            <p><span class="hl hl-concession" data-dim="concession">In all but a few cases [27], however, such attention mechanisms are used in conjunction with a recurrent network.</span></p>
+          </div>
+        </div>
+
+        <div class="dims reveal">
+          <button class="dim-btn" type="button" data-dim="thesis" aria-pressed="false" style="--dot: var(--dot-thesis)">
+            <span class="dot" aria-hidden="true"></span>
+            <strong><span class="l-zh">核心论点</span><span class="l-en">Thesis</span></strong>
+            <span class="q"><span class="l-zh">作者想让我相信什么？</span><span class="l-en">What should I believe?</span></span>
+          </button>
+          <button class="dim-btn" type="button" data-dim="concept" aria-pressed="false" style="--dot: var(--dot-concept)">
+            <span class="dot" aria-hidden="true"></span>
+            <strong><span class="l-zh">关键概念</span><span class="l-en">Concepts</span></strong>
+            <span class="q"><span class="l-zh">哪个词是全文的承重墙？</span><span class="l-en">Which term carries the argument?</span></span>
+          </button>
+          <button class="dim-btn" type="button" data-dim="evidence" aria-pressed="false" style="--dot: var(--dot-evidence)">
+            <span class="dot" aria-hidden="true"></span>
+            <strong><span class="l-zh">证据数据</span><span class="l-en">Evidence</span></strong>
+            <span class="q"><span class="l-zh">哪些数字在替作者说话？</span><span class="l-en">Which numbers speak for the author?</span></span>
+          </button>
+          <button class="dim-btn" type="button" data-dim="concession" aria-pressed="false" style="--dot: var(--dot-concession)">
+            <span class="dot" aria-hidden="true"></span>
+            <strong><span class="l-zh">让步反驳</span><span class="l-en">Concessions</span></strong>
+            <span class="q"><span class="l-zh">作者预判了谁的攻击？</span><span class="l-en">Which objection is being handled?</span></span>
+          </button>
+          <button class="dim-btn" type="button" data-dim="method" aria-pressed="false" style="--dot: var(--dot-method)">
+            <span class="dot" aria-hidden="true"></span>
+            <strong><span class="l-zh">方法论</span><span class="l-en">Method</span></strong>
+            <span class="q"><span class="l-zh">结论在什么条件下成立？</span><span class="l-en">Under what conditions does this hold?</span></span>
+          </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="workflow">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <h2>
+            <span class="l-zh">从 PDF 到可归档的阅读页。</span>
+            <span class="l-en">From PDF to an archival reading page.</span>
+          </h2>
+          <p class="sec-lead">
+            <span class="l-zh">读全文、分章节、逐段标注、交付前核对。长文不会被偷偷截断。</span>
+            <span class="l-en">Read every page, split by chapter, annotate paragraph by paragraph, verify before delivery. Long papers are never silently truncated.</span>
+          </p>
+        </div>
+
+        <ol class="flow reveal">
+          <li class="flow-step">
+            <span class="flow-code">read</span>
+            <h3><span class="l-zh">读全文</span><span class="l-en">Read every page</span></h3>
+            <p><span class="l-zh">逐页读取 PDF；扫描版没有文本层时先提示 OCR。</span><span class="l-en">Reads each page. Scanned PDFs without a text layer are flagged for OCR first.</span></p>
+          </li>
+          <li class="flow-step">
+            <span class="flow-code">outline</span>
+            <h3><span class="l-zh">分章节</span><span class="l-en">Split by chapter</span></h3>
+            <p><span class="l-zh">长文先展示完整目录，再按章节分批生成。</span><span class="l-en">Long papers show the full outline before batch generation.</span></p>
+          </li>
+          <li class="flow-step">
+            <span class="flow-code">annotate</span>
+            <h3><span class="l-zh">逐段标注</span><span class="l-en">Annotate each paragraph</span></h3>
+            <p><span class="l-zh">英文原文五色标注，中文意译在下方，批注在右栏。</span><span class="l-en">Five colors on the English, translation below, notes beside.</span></p>
+          </li>
+          <li class="flow-step">
+            <span class="flow-code">verify</span>
+            <h3><span class="l-zh">交付前核对</span><span class="l-en">Verify before delivery</span></h3>
+            <p><span class="l-zh">引文逐字核对，批评必须落到具体句子或数字。</span><span class="l-en">Quotes checked verbatim. Every critique points to a specific line or number.</span></p>
+          </li>
+        </ol>
+
+        <div class="rules reveal">
+          <div class="rule">
+            <strong><span class="l-zh">逐字引用</span><span class="l-en">Quote verbatim</span></strong>
+            <span><span class="l-zh">直接引用的原句回到论文核对，关键数据标注章节。</span><span class="l-en">Direct quotes return to the paper. Key numbers carry their section.</span></span>
+          </div>
+          <div class="rule">
+            <strong><span class="l-zh">长文不省略</span><span class="l-en">No truncation</span></strong>
+            <span><span class="l-zh">按目录分节生成，最后核对节数与目录一致。</span><span class="l-en">Generated section by section, then checked against the outline.</span></span>
+          </div>
+          <div class="rule">
+            <strong><span class="l-zh">批评有依据</span><span class="l-en">Evidence for every critique</span></strong>
+            <span><span class="l-zh">没有具体依据的漏洞不写，避免为了找问题而找问题。</span><span class="l-en">No weakness without a source. The model is not rewarded for inventing flaws.</span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="demo">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <h2>
+            <span class="l-zh">看一页真实的产出。</span>
+            <span class="l-en">See a real output.</span>
+          </h2>
+          <p class="sec-lead">
+            <span class="l-zh">桌面双栏，移动端单栏。底部有整篇论文的论证骨架。</span>
+            <span class="l-en">Two columns on desktop, one on mobile. The argument skeleton sits at the bottom.</span>
+          </p>
+        </div>
+
+        <div class="demo-grid">
+          <figure class="shot-lg reveal">
+            <img src="docs/demo-top.webp" width="1200" height="1200" alt="桌面端双栏批注界面 / desktop two-column annotated page" loading="lazy">
+            <figcaption><span class="l-zh">桌面：英中对照与逐段批注。</span><span class="l-en">Desktop: side-by-side text and paragraph notes.</span></figcaption>
+          </figure>
+          <figure class="phone-wrap reveal">
+            <div class="phone">
+              <img src="docs/mobile.webp" width="390" height="844" alt="移动端单栏批注界面 / mobile single-column annotated page" loading="lazy">
+            </div>
+            <figcaption><span class="l-zh">移动：单栏阅读。</span><span class="l-en">Mobile: single-column reading.</span></figcaption>
+          </figure>
+        </div>
+
+        <figure class="shot-wide reveal">
+          <img src="docs/demo-bottom.webp" width="1200" height="571" alt="论文底部论证结构总览 / argument skeleton overview" loading="lazy">
+          <figcaption><span class="l-zh">底部：问题 → 论点 → 方法 → 证据 → 反驳 → 结论。</span><span class="l-en">Bottom: problem → thesis → method → evidence → objection → conclusion.</span></figcaption>
+        </figure>
+
+        <div class="demo-cta reveal">
+          <a class="btn btn-primary" href="examples/demo.html">
+            <span class="l-zh">打开示例</span><span class="l-en">Open the demo</span>
+            <span aria-hidden="true">→</span>
+          </a>
+          <span class="demo-note"><span class="l-zh">单文件，离线可开。</span><span class="l-en">Single file. Opens offline.</span></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="install">
+      <div class="wrap install-grid">
+        <div class="install-copy reveal">
+          <h2>
+            <span class="l-zh">一条命令安装。</span>
+            <span class="l-en">Install with one command.</span>
+          </h2>
+          <p class="sec-lead">
+            <span class="l-zh">把仓库放进 Claude Code 的技能目录，重启会话即可。</span>
+            <span class="l-en">Clone it into the Claude Code skills directory and restart the session.</span>
+          </p>
+          <p class="say">
+            <span class="l-zh">然后说：用 ReadPapers 把这篇 PDF 做成批注网页。</span>
+            <span class="l-en">Then say: Use ReadPapers on this PDF.</span>
+          </p>
+          <ul class="facts">
+            <li><b>MIT</b><span><span class="l-zh">开源许可</span><span class="l-en">License</span></span></li>
+            <li><b>0</b><span><span class="l-zh">外部依赖</span><span class="l-en">Dependencies</span></span></li>
+            <li><b>PDF</b><span><span class="l-zh">本地文件、Zotero 或粘贴文本</span><span class="l-en">Local file, Zotero, or pasted text</span></span></li>
+            <li><b>HTML</b><span><span class="l-zh">单文件，离线可开</span><span class="l-en">Single file, opens offline</span></span></li>
+          </ul>
+        </div>
+
+        <div class="terminal reveal">
+          <div class="terminal-top">
+            <span class="terminal-label">install</span>
+            <button class="copy-btn" type="button" id="copyBtn" data-copied="false">
+              <span class="copy-label"><span class="l-zh">复制</span><span class="l-en">Copy</span></span>
+              <span class="copied-label"><span class="l-zh">已复制</span><span class="l-en">Copied</span></span>
+            </button>
+          </div>
+          <pre><code id="installCmd"><span class="prompt">$ </span>git clone https://github.com/tsingke/ReadPapers.git ~/.claude/skills/ReadPapers</code></pre>
+          <p class="terminal-note"><span class="l-zh">需要已安装 Claude Code。克隆后重启会话，技能会自动加载。</span><span class="l-en">Requires Claude Code. Restart the session after cloning and the skill loads automatically.</span></p>
+          <span class="sr-only" id="copyStatus" aria-live="polite"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <img src="docs/favicon.svg" alt="" width="22" height="22">
+          <span>ReadPapers</span>
+          <span class="muted"><span class="l-zh">开源 · MIT</span><span class="l-en">Open source · MIT</span></span>
+        </div>
+        <nav class="footer-links" aria-label="页脚导航">
+          <a href="https://github.com/tsingke/ReadPapers">GitHub</a>
+          <a href="https://github.com/tsingke/ReadPapers#readme">README</a>
+          <a href="examples/demo.html"><span class="l-zh">示例</span><span class="l-en">Demo</span></a>
+        </nav>
+      </div>
+      <p class="footer-note"><span class="l-zh">为读论文的人做的开源技能。批注是阅读假设，不是判决。</span><span class="l-en">An open-source skill for people who read papers. Annotations are reading hypotheses, not verdicts.</span></p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var langBtns = Array.prototype.slice.call(document.querySelectorAll('[data-set-lang]'));
+      var themeBtn = document.getElementById('themeToggle');
+      var menuBtn = document.getElementById('menuBtn');
+      var navLinks = document.getElementById('navLinks');
+
+      var meta = {
+        zh: {
+          title: 'ReadPapers · 把论文 PDF 变成双栏批注网页',
+          desc: 'ReadPapers 是 Claude Code 技能：把学术论文 PDF 变成英中双栏、五色标注、逐段批注的单文件 HTML 网页。'
+        },
+        en: {
+          title: 'ReadPapers · Turn paper PDFs into annotated reading pages',
+          desc: 'ReadPapers is a Claude Code skill that turns paper PDFs into bilingual, five-color annotated, single-file HTML reading pages.'
+        }
+      };
+
+      function setMetaContent(selector, value) {
+        var el = document.querySelector(selector);
+        if (el) el.setAttribute('content', value);
+      }
+
+      function currentLang() { return root.getAttribute('data-lang') || 'zh'; }
+      function currentTheme() { return root.getAttribute('data-theme') || 'light'; }
+
+      function updateThemeLabel() {
+        var isZh = currentLang() === 'zh';
+        var label;
+        if (isZh) label = currentTheme() === 'light' ? '切换到深色主题' : '切换到浅色主题';
+        else label = currentTheme() === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
+        themeBtn.setAttribute('aria-label', label);
+        themeBtn.setAttribute('aria-pressed', currentTheme() === 'dark' ? 'true' : 'false');
+      }
+
+      function updateMeta() {
+        var l = currentLang();
+        document.title = meta[l].title;
+        setMetaContent('meta[name="description"]', meta[l].desc);
+        setMetaContent('meta[property="og:title"]', meta[l].title);
+        setMetaContent('meta[property="og:description"]', meta[l].desc);
+        updateThemeLabel();
+      }
+
+      function syncLangButtons() {
+        var l = currentLang();
+        langBtns.forEach(function (b) {
+          b.setAttribute('aria-pressed', b.getAttribute('data-set-lang') === l ? 'true' : 'false');
+        });
+      }
+
+      langBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+          var l = b.getAttribute('data-set-lang');
+          root.setAttribute('data-lang', l);
+          root.setAttribute('lang', l === 'zh' ? 'zh-CN' : 'en');
+          try { localStorage.setItem('rp-lang', l); } catch (e) {}
+          syncLangButtons();
+          updateMeta();
+        });
+      });
+
+      themeBtn.addEventListener('click', function () {
+        var next = currentTheme() === 'light' ? 'dark' : 'light';
+        root.setAttribute('data-theme', next);
+        try { localStorage.setItem('rp-theme', next); } catch (e) {}
+        var themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor) themeColor.setAttribute('content', next === 'dark' ? '#0f1319' : '#f6f2e9');
+        updateThemeLabel();
+      });
+
+      function closeMenu() {
+        navLinks.classList.remove('open');
+        menuBtn.setAttribute('aria-expanded', 'false');
+      }
+      menuBtn.addEventListener('click', function () {
+        var open = navLinks.classList.toggle('open');
+        menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      navLinks.addEventListener('click', function (e) {
+        if (e.target.closest('a')) closeMenu();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && navLinks.classList.contains('open')) {
+          closeMenu();
+          menuBtn.focus();
+        }
+      });
+      document.addEventListener('click', function (e) {
+        if (!navLinks.classList.contains('open')) return;
+        if (e.target.closest('#navLinks') || e.target.closest('#menuBtn')) return;
+        closeMenu();
+      });
+
+      /* Tabs */
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+      function selectTab(tab, focus) {
+        tabs.forEach(function (t) {
+          var selected = t === tab;
+          t.setAttribute('aria-selected', selected ? 'true' : 'false');
+          t.tabIndex = selected ? 0 : -1;
+          var panel = document.getElementById(t.getAttribute('aria-controls'));
+          if (panel) panel.hidden = !selected;
+        });
+        if (focus) tab.focus();
+      }
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () { selectTab(tab, false); });
+      });
+      tabs.forEach(function (tab, i) {
+        tab.addEventListener('keydown', function (e) {
+          var next = null;
+          if (e.key === 'ArrowRight') next = (i + 1) % tabs.length;
+          else if (e.key === 'ArrowLeft') next = (i - 1 + tabs.length) % tabs.length;
+          else if (e.key === 'Home') next = 0;
+          else if (e.key === 'End') next = tabs.length - 1;
+          if (next === null) return;
+          e.preventDefault();
+          selectTab(tabs[next], true);
+        });
+      });
+
+      /* Color filter */
+      var dimBtns = Array.prototype.slice.call(document.querySelectorAll('.dim-btn'));
+      var excerpt = document.getElementById('excerpt');
+      var resetColors = document.getElementById('resetColors');
+      var axisZh = document.getElementById('axisZh');
+      var axisEn = document.getElementById('axisEn');
+      var dimNames = {
+        thesis: { zh: '核心论点', en: 'Thesis' },
+        concept: { zh: '关键概念', en: 'Concepts' },
+        evidence: { zh: '证据数据', en: 'Evidence' },
+        concession: { zh: '让步反驳', en: 'Concessions' },
+        method: { zh: '方法论', en: 'Method' }
+      };
+      var activeDim = null;
+
+      function setDim(dim) {
+        activeDim = dim;
+        if (dim) excerpt.setAttribute('data-focus', dim);
+        else excerpt.removeAttribute('data-focus');
+        dimBtns.forEach(function (b) {
+          b.setAttribute('aria-pressed', b.getAttribute('data-dim') === dim ? 'true' : 'false');
+        });
+        if (dim) {
+          axisZh.textContent = '只看：' + dimNames[dim].zh;
+          axisEn.textContent = 'Showing: ' + dimNames[dim].en;
+        } else {
+          axisZh.textContent = '当前：全部维度';
+          axisEn.textContent = 'Showing: all dimensions';
+        }
+      }
+      dimBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+          var dim = b.getAttribute('data-dim');
+          setDim(activeDim === dim ? null : dim);
+        });
+      });
+      resetColors.addEventListener('click', function () { setDim(null); });
+
+      /* Copy install command */
+      var copyBtn = document.getElementById('copyBtn');
+      var installCmd = document.getElementById('installCmd');
+      var copyStatus = document.getElementById('copyStatus');
+      var copyTimer = null;
+      copyBtn.addEventListener('click', function () {
+        var text = installCmd.textContent.replace(/^\$\s*/, '').trim();
+        function done() {
+          copyBtn.setAttribute('data-copied', 'true');
+          copyStatus.textContent = currentLang() === 'zh' ? '安装命令已复制' : 'Install command copied';
+          if (copyTimer) clearTimeout(copyTimer);
+          copyTimer = setTimeout(function () {
+            copyBtn.setAttribute('data-copied', 'false');
+            copyStatus.textContent = '';
+          }, 2000);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(function () {
+            fallbackCopy(text);
+            done();
+          });
+        } else {
+          fallbackCopy(text);
+          done();
+        }
+      });
+      function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+
+      /* Reveal on scroll */
+      var reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if ('IntersectionObserver' in window && !reduceMotion) {
+        var revealObserver = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('in');
+              revealObserver.unobserve(entry.target);
+            }
+          });
+        }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+        reveals.forEach(function (el) { revealObserver.observe(el); });
+      } else {
+        reveals.forEach(function (el) { el.classList.add('in'); });
+      }
+
+      /* Active section in nav */
+      var sections = Array.prototype.slice.call(document.querySelectorAll('main section[id]'));
+      var navAnchors = Array.prototype.slice.call(document.querySelectorAll('.nav-links a[href^="#"]'));
+      if ('IntersectionObserver' in window) {
+        var sectionObserver = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            var id = '#' + entry.target.id;
+            navAnchors.forEach(function (a) {
+              a.classList.toggle('active', a.getAttribute('href') === id);
+            });
+          });
+        }, { rootMargin: '-42% 0px -52% 0px' });
+        sections.forEach(function (s) { sectionObserver.observe(s); });
+      }
+
+      /* Initial state */
+      syncLangButtons();
+      setDim(null);
+      updateMeta();
+    })();
+  </script>
+</body>
+</html>
